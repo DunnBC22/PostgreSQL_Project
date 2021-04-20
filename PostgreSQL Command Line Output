@@ -1,0 +1,1045 @@
+Last login: Mon Apr 19 08:32:20 on ttys000
+
+briandunn$ psql
+psql (13.2)
+Type "help" for help.
+
+briandunn=# \list
+                                  List of databases
+   Name    |   Owner   | Encoding |   Collate   |    Ctype    |   Access privileges   
+-----------+-----------+----------+-------------+-------------+-----------------------
+ briandunn | briandunn | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ postgres  | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ template0 | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |           |          |             |             | postgres=CTc/postgres
+ template1 | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |           |          |             |             | postgres=CTc/postgres
+(4 rows)
+
+briandunn=# CREATE DATABASE retail;
+CREATE DATABASE
+briandunn=# \list
+                                  List of databases
+   Name    |   Owner   | Encoding |   Collate   |    Ctype    |   Access privileges   
+-----------+-----------+----------+-------------+-------------+-----------------------
+ briandunn | briandunn | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ postgres  | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ retail    | briandunn | UTF8     | en_US.UTF-8 | en_US.UTF-8 | 
+ template0 | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |           |          |             |             | postgres=CTc/postgres
+ template1 | postgres  | UTF8     | en_US.UTF-8 | en_US.UTF-8 | =c/postgres          +
+           |           |          |             |             | postgres=CTc/postgres
+(5 rows)
+
+briandunn=# 
+briandunn=# \connect retail
+You are now connected to database "retail" as user "briandunn".
+retail=# CREATE SCHEMA retailStores;
+CREATE SCHEMA
+retail=# CREATE TABLE retailStores.Sales(storeID smallint NOT NULL, dept varchar(2), salesDate date, weeklySales money);
+CREATE TABLE
+retail=# CREATE TABLE retailStores.Stores(storeID int NOT NULL, storeType varchar(2) NOT NULL, storeSize int NOT NULL);
+CREATE TABLE
+retail=# CREATE TABLE retailStores.Features(storeID smallint NOT NULL, featureDate date, Temperature decimal, fuelPrice decimal, CPI decimal, unemployment decimal, isHoliday boolean);
+CREATE TABLE
+retail=# SELECT *
+retail-# FROM pg_catalog.pg_tables
+retail-# WHERE schemaname != 'pg_catalog' AND 
+retail-#     schemaname != 'information_schema';
+  schemaname  | tablename | tableowner | tablespace | hasindexes | hasrules | hastriggers | rowsecurity 
+--------------+-----------+------------+------------+------------+----------+-------------+-------------
+ retailstores | sales     | briandunn  |            | f          | f        | f           | f
+ retailstores | stores    | briandunn  |            | f          | f        | f           | f
+ retailstores | features  | briandunn  |            | f          | f        | f           | f
+(3 rows)
+
+retail=# \d+ retailStores.stores
+                                        Table "retailstores.stores"
+  Column   |         Type         | Collation | Nullable | Default | Storage  | Stats target | Description 
+-----------+----------------------+-----------+----------+---------+----------+--------------+-------------
+ storeid   | integer              |           | not null |         | plain    |              | 
+ storetype | character varying(2) |           | not null |         | extended |              | 
+ storesize | integer              |           | not null |         | plain    |              | 
+Access method: heap
+
+retail=# ALTER TABLE retailStores.stores SET UNLOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.features SET UNLOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.sales SET UNLOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.stores DISABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.features DISABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.sales DISABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Stores SET LOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Features SET LOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Sales SET LOGGED;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Stores ENABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Features ENABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Sales ENABLE TRIGGER ALL;
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Stores ADD PRIMARY KEY (storeID);
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Sales ADD CONSTRAINT salesfk FOREIGN KEY (storeID) REFERENCES retailStores.Stores(storeID);
+ALTER TABLE
+retail=# ALTER TABLE retailStores.Features ADD CONSTRAINT featuresfk FOREIGN KEY (storeID) REFERENCES retailStores.Stores(storeID);
+ALTER TABLE
+retail=# SELECT 
+retail-#     ST.StoreID,
+retail-#     MIN(F.temperature) AS MinTemp,
+retail-#     MAX(F.temperature) AS MaxTemp,
+retail-#     ROUND(AVG(F.temperature),2) as AvgTemp,
+retail-#     MIN(F.fuelPrice) AS MinFuelPrice,
+retail-#     MAX(F.fuelPrice) AS MaxFuelPrice,
+retail-#     ROUND(AVG(F.fuelPrice),3) AS AvgFuelPrice
+retail-# FROM
+retail-#     retailStores.Stores AS ST
+retail-#         INNER JOIN
+retail-#     retailStores.Features AS F ON ST.storeID = F.storeID
+retail-# GROUP BY ST.storeID;
+ storeid | mintemp | maxtemp | avgtemp | minfuelprice | maxfuelprice | avgfuelprice 
+---------+---------+---------+---------+--------------+--------------+--------------
+      42 |   40.67 |   95.36 |   71.33 |        2.825 |        4.468 |        3.616
+      29 |   20.61 |   80.67 |   53.46 |        2.716 |        4.101 |        3.498
+       4 |   28.84 |   86.29 |   61.42 |         2.54 |        3.881 |        3.255
+      34 |   23.82 |   87.73 |   58.11 |         2.54 |        3.881 |        3.255
+      41 |   13.54 |   76.54 |   46.97 |         2.55 |        3.936 |        3.294
+      40 |    9.51 |   76.67 |   46.17 |        2.716 |        4.101 |        3.498
+      43 |   33.21 |   91.36 |   67.62 |        2.514 |        3.907 |        3.259
+      32 |   15.47 |   81.95 |   51.22 |         2.55 |        3.936 |        3.294
+      10 |   40.67 |   95.36 |   71.33 |        2.825 |        4.468 |        3.616
+       9 |   31.82 |   91.63 |   66.27 |        2.514 |        3.907 |        3.259
+       7 |   -7.29 |   68.84 |   37.92 |         2.55 |        3.936 |        3.294
+      35 |   23.64 |   83.36 |   55.82 |        2.699 |        4.066 |        3.476
+      45 |   24.05 |   82.99 |   56.26 |        2.699 |        4.066 |        3.476
+      38 |   36.49 |  101.95 |   69.25 |        2.825 |        4.468 |        3.644
+      15 |   18.82 |   79.97 |   50.32 |        2.837 |        4.211 |        3.643
+       6 |   38.37 |   91.46 |   68.50 |        2.514 |        3.907 |        3.259
+      26 |    5.54 |   71.08 |   42.27 |        2.716 |        4.101 |        3.498
+      12 |   36.49 |  101.95 |   69.25 |        2.825 |        4.468 |        3.644
+      39 |   40.34 |   88.65 |   69.70 |        2.514 |        3.907 |        3.259
+      24 |   17.91 |   80.11 |   52.51 |        2.837 |        4.211 |        3.643
+      19 |   20.04 |   79.37 |   50.86 |        2.837 |        4.211 |        3.643
+      36 |   41.16 |   87.64 |   70.23 |        2.472 |        3.934 |        3.246
+      25 |    18.3 |    78.1 |   50.79 |        2.699 |        4.066 |        3.476
+      31 |   34.14 |   94.22 |   67.41 |        2.514 |        3.907 |        3.259
+      30 |   34.14 |   94.22 |   67.41 |        2.514 |        3.907 |        3.259
+      21 |   34.14 |   94.22 |   67.41 |        2.514 |        3.907 |        3.259
+      14 |   24.05 |   82.99 |   56.26 |        2.699 |        4.066 |        3.476
+       3 |   43.57 |   89.12 |   70.39 |        2.514 |        3.907 |        3.259
+      17 |    0.25 |   75.91 |   45.09 |        2.654 |        3.845 |        3.329
+      37 |   41.16 |   87.64 |   70.23 |        2.514 |        3.907 |        3.259
+      28 |   36.49 |  101.95 |   69.25 |        2.825 |        4.468 |        3.644
+      22 |   20.61 |   80.67 |   53.46 |        2.716 |        4.101 |        3.498
+      20 |   20.39 |    79.2 |   53.89 |        2.699 |        4.066 |        3.476
+retail=# INSERT INTO retailStores.Stores (storeID, storeType, storeSize) VALUES (46, 'C', 41569);
+INSERT 0 1
+retail=# SELECT * FROM retailStores.Stores;
+ storeid | storetype | storesize 
+---------+-----------+-----------
+       1 | A         |    151315
+       2 | A         |    202307
+       3 | B         |     37392
+       4 | A         |    205863
+       5 | B         |     34875
+       6 | A         |    202505
+       7 | B         |     70713
+       8 | A         |    155078
+       9 | B         |    125833
+      10 | B         |    126512
+      11 | A         |    207499
+      12 | B         |    112238
+      13 | A         |    219622
+      14 | A         |    200898
+      15 | B         |    123737
+      16 | B         |     57197
+      17 | B         |     93188
+      18 | B         |    120653
+      19 | A         |    203819
+      20 | A         |    203742
+      21 | B         |    140167
+      22 | B         |    119557
+      23 | B         |    114533
+      24 | A         |    203819
+      25 | B         |    128107
+      26 | A         |    152513
+      27 | A         |    204184
+      28 | A         |    206302
+      29 | B         |     93638
+      30 | C         |     42988
+      31 | A         |    203750
+      32 | A         |    203007
+      33 | A         |     39690
+      34 | A         |    158114
+      35 | B         |    103681
+      36 | A         |     39910
+      37 | C         |     39910
+      38 | C         |     39690
+      39 | A         |    184109
+      40 | A         |    155083
+      41 | A         |    196321
+      42 | C         |     39690
+      43 | C         |     41062
+      44 | C         |     39910
+      45 | B         |    118221
+      46 | C         |     41569
+(46 rows)
+
+retail=# SELECT COUNT(storeID) FROM retailStores.Stores WHERE storeSize>50000;
+ count 
+-------
+    35
+(1 row)
+
+retail=# SELECT F.unemployment FROM retailStores.Features as F WHERE F.temperature>82 LIMIT 150;
+ unemployment 
+--------------
+        7.808
+        7.808
+        7.787
+        7.787
+        7.787
+        7.787
+        7.787
+        7.787
+        7.787
+        7.682
+        7.682
+        7.682
+        7.682
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.962
+        7.143
+        6.908
+        6.908
+        6.908
+        6.908
+        6.908
+             
+             
+          8.2
+          8.2
+          8.2
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        8.099
+        7.931
+        7.931
+        7.931
+        7.931
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        7.852
+        6.891
+        6.565
+        6.565
+        6.565
+        6.565
+        6.565
+        6.565
+        6.565
+        6.565
+             
+             
+             
+        7.343
+        7.343
+        7.343
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.346
+        7.574
+        7.574
+retail=# SELECT 
+retail-#     EXTRACT(month FROM SA.salesDate) AS Month_Name,
+retail-#     ROUND(AVG(CAST(SA.weeklySales AS decimal)), 2) AS Ave_Weekly_Sales
+retail-# FROM
+retail-#     retailStores.Sales AS SA
+retail-#         LEFT JOIN
+retail-#     retailStores.Stores AS ST ON SA.storeID = ST.storeID
+retail-# GROUP BY Month_Name
+retail-# ORDER BY Ave_Weekly_Sales desc;
+ month_name | ave_weekly_sales 
+------------+------------------
+         12 |         18342.25
+         11 |         17271.74
+          6 |         16258.14
+          2 |         16026.82
+          8 |         16012.02
+          5 |         15850.12
+         10 |         15728.04
+          4 |         15638.15
+          3 |         15631.68
+          7 |         15563.15
+          9 |         15378.84
+          1 |         14503.31
+(12 rows)
+
+retail=# SELECT ROUND(AVG(CAST(SA.weeklySales AS decimal)), 2) AS WeeklySales, ROUND(AVG(F.unemployment),2) AS Unemployment, ROUND(AVG(F.Temperature),0) AS Temperature, ROUND(AVG(F.CPI),2) AS CPI
+retail-# FROM retailStores.Sales as SA 
+retail-# INNER JOIN retailStores.Features AS F
+retail-# ON SA.storeID=F.storeID
+retail-# WHERE F.unemployment::text LIKE '7.%';
+ weeklysales | unemployment | temperature |  cpi   
+-------------+--------------+-------------+--------
+    17568.24 |         7.54 |          57 | 180.73
+(1 row)
+
+retail=# SELECT
+retail-# COALESCE(ST.storeType, 'Total') AS Store_Type, 
+retail-# round(AVG(CAST(SA.weeklySales AS numeric)), 2) AS Ave_Weekly_Sales, 
+retail-#     round(MIN(CAST(SA.weeklySales AS numeric)), 2) AS Min_Weekly_Sales,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric)), 2) AS Max_Weekly_Sales,
+retail-#     round(AVG(CAST(ST.storeSize AS numeric)), 0) AS Ave_Store_Size,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric))-MIN(CAST(SA.weeklySales AS decimal)), 2) AS Sales_Range,
+retail-# COUNT(ST.storeType) AS NumOfStoreType
+retail-# FROM
+retail-#     retailStores.Sales AS SA 
+retail-#     LEFT JOIN retailStores.Stores AS ST 
+retail-# ON ST.storeID=SA.storeID
+retail-# GROUP BY ROLLUP(ST.storeType);
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+(END)
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421570
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42597
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+~
+retail=# SELECT 
+retail-# COALESCE(ST.storeType, 'Total') AS Store_Type, 
+retail-# round(AVG(CAST(SA.weeklySales AS numeric)), 2) AS Ave_Weekly_Sales, 
+retail-#     round(MIN(CAST(SA.weeklySales AS numeric)), 2) AS Min_Weekly_Sales,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric)), 2) AS Max_Weekly_Sales,
+retail-#     round(AVG(CAST(ST.storeSize AS numeric)), 0) AS Ave_Store_Size,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric))-MIN(CAST(SA.weeklySales AS decimal)), 2) AS Sales_Range,
+retail-# COUNT(StoreType) AS NumOfStoreType
+retail-# FROM
+retail-#     (retailStores.Stores AS ST
+retail(#     LEFT JOIN retailStores.Sales AS SA ON ((ST.storeID=SA.storeID)))
+retail-# GROUP BY CUBE(ST.storeType);
+ store_type | ave_weekly_sales | min_weekly_sales | max_weekly_sales | ave_store_size | sales_range | numofstoretype 
+------------+------------------+------------------+------------------+----------------+-------------+----------------
+ Total      |         15981.26 |         -4988.94 |        693099.36 |         136728 |   698088.30 |         421571
+ A          |         20099.57 |         -4988.94 |        474330.10 |         182231 |   479319.04 |         215478
+ C          |          9519.53 |          -379.00 |        112152.35 |          40536 |   112531.35 |          42598
+ B          |         12237.08 |         -3924.00 |        693099.36 |         101819 |   697023.36 |         163495
+(4 rows)
+
+retail=# CREATE VIEW retailStores.AvgSalesByStoreType AS
+retail-#     SELECT 
+retail-#         ST.storeType AS StoreType,
+retail-#         AVG(CAST(SA.weeklySales AS numeric)) AS AverageWeeklySales
+retail-#     FROM
+retail-#         (retailStores.Stores AS ST
+retail(#         INNER JOIN retailStores.Sales AS SA ON ((ST.storeID = SA.storeID)))
+retail-#     GROUP BY ST.storeType;
+CREATE VIEW
+retail=# EXPLAIN SELECT 
+retail-# COALESCE(ST.storeType, 'Total') AS Store_Type, 
+retail-# round(AVG(CAST(SA.weeklySales AS numeric)), 2) AS Ave_Weekly_Sales, 
+retail-#     round(MIN(CAST(SA.weeklySales AS numeric)), 2) AS Min_Weekly_Sales,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric)), 2) AS Max_Weekly_Sales,
+retail-#     round(AVG(CAST(ST.storeSize AS numeric)), 0) AS Ave_Store_Size,
+retail-# round(MAX(CAST(SA.weeklySales AS numeric))-MIN(CAST(SA.weeklySales AS decimal)), 2) AS Sales_Range,
+retail-# COUNT(StoreType) AS NumOfStoreType
+retail-# FROM
+retail-#     (retailStores.Stores AS ST
+retail(#     LEFT JOIN retailStores.Sales AS SA ON ((ST.storeID=SA.storeID)))
+retail-# GROUP BY CUBE(ST.storeType);
+                                 QUERY PLAN                                  
+-----------------------------------------------------------------------------
+ MixedAggregate  (cost=2.01..41737.23 rows=4 width=202)
+   Hash Key: st.storetype
+   Group Key: ()
+   ->  Hash Right Join  (cost=2.01..8894.99 rows=486550 width=14)
+         Hash Cond: (sa.storeid = st.storeid)
+         ->  Seq Scan on sales sa  (cost=0.00..7495.50 rows=486550 width=10)
+         ->  Hash  (cost=1.45..1.45 rows=45 width=10)
+               ->  Seq Scan on stores st  (cost=0.00..1.45 rows=45 width=10)
+(8 rows)
+
+retail=# SELECT * INTO retailStores.StoresClone FROM retailStores.Stores;
+SELECT 46
+retail=# SELECT * FROM retailStores.StoresClone;
+ storeid | storetype | storesize 
+---------+-----------+-----------
+       1 | A         |    151315
+       2 | A         |    202307
+       3 | B         |     37392
+       4 | A         |    205863
+       5 | B         |     34875
+       6 | A         |    202505
+       7 | B         |     70713
+       8 | A         |    155078
+       9 | B         |    125833
+      10 | B         |    126512
+      11 | A         |    207499
+      12 | B         |    112238
+      13 | A         |    219622
+      14 | A         |    200898
+      15 | B         |    123737
+      16 | B         |     57197
+      17 | B         |     93188
+      18 | B         |    120653
+      19 | A         |    203819
+      20 | A         |    203742
+      21 | B         |    140167
+      22 | B         |    119557
+      23 | B         |    114533
+      24 | A         |    203819
+      25 | B         |    128107
+      26 | A         |    152513
+      27 | A         |    204184
+      28 | A         |    206302
+      29 | B         |     93638
+      30 | C         |     42988
+      31 | A         |    203750
+      32 | A         |    203007
+      33 | A         |     39690
+      34 | A         |    158114
+      35 | B         |    103681
+      36 | A         |     39910
+      37 | C         |     39910
+      38 | C         |     39690
+      39 | A         |    184109
+      40 | A         |    155083
+      41 | A         |    196321
+      42 | C         |     39690
+      43 | C         |     41062
+      44 | C         |     39910
+      45 | B         |    118221
+      46 | C         |     41569
+(46 rows)
+
+retail=# SELECT 
+retail-# count(SA.storeID) AS NumOfSalesEntries,                                                                              min(SA.weeklySales) AS MinimumSaleAmt,                                                                               max(SA.weeklySales) AS MaximumSaleAmt,                                                                               sum(SA.weeklySales) AS TotalSalesAmt                                                                                 FROM retailStores.Sales AS SA; 
+ numofsalesentries | minimumsaleamt | maximumsaleamt |   totalsalesamt   
+-------------------+----------------+----------------+-------------------
+            421570 |     -$4,988.94 |    $693,099.36 | $6,737,218,987.11
+(1 row)
+
+retail=# SELECT 
+retail-# count(F.unemployment) AS num_of_entries, 
+retail-# min(F.unemployment) AS Minimum, 
+retail-# max(F.unemployment) AS Maximum,
+retail-# round(avg(F.unemployment),2) AS Average
+retail-# FROM retailStores.Sales AS SA
+retail-# INNER JOIN retailStores.Features AS F
+retail-# ON SA.storeID=F.storeID;
+ num_of_entries | minimum | maximum | average 
+----------------+---------+---------+---------
+       71245330 |   3.684 |  14.313 |    7.80
+(1 row)
+
+retail=# SELECT 
+retail-# count(F.unemployment) AS num_of_entries, 
+retail-# min(F.unemployment) AS Minimum, 
+retail-# max(F.unemployment) AS Maximum,
+retail-# round(avg(F.unemployment),2) AS Average
+retail-# FROM retailStores.Sales AS SA
+retail-# INNER JOIN retailStores.Features AS F
+retail-# ON SA.storeID=F.storeID;
+ num_of_entries | minimum | maximum | average 
+----------------+---------+---------+---------
+       71245330 |   3.684 |  14.313 |    7.80
+(1 row)
+
+retail=# SELECT corr(Unemployment, WeeklySales) AS Correlation
+retail-# FROM (
+retail(# SELECT
+retail(# CAST(F.unemployment AS numeric) AS Unemployment,
+retail(# CAST(SA.weeklySales AS numeric) AS WeeklySales
+retail(# FROM retailStores.Sales AS SA
+retail(# INNER JOIN retailStores.Features AS F
+retail(# ON SA.storeID=F.storeID
+retail(# GROUP BY (1, WeeklySales)
+retail(# ) as a;
+
+      correlation      
+-----------------------
+ -0.020181142826214252
+(1 row)
+
+retail=# 
+retail=# SELECT
+retail-# regr_slope(unem, sales) AS Linear_Regression_Slope,
+retail-# regr_intercept(unem, sales) AS Linear_Regression_Intercept,
+retail-# regr_r2(unem, sales) AS Linear_Regression_R2
+retail-# FROM(
+retail(# SELECT
+retail(# 
+
+retail(# CAST(F.unemployment AS numeric) AS unem, 
+retail(# 
+
+retail(# CAST(SA.weeklySales AS numeric) AS sales
+retail(# FROM retailStores.Sales AS SA
+retail(# INNER JOIN retailStores.Features AS F
+retail(# ON SA.storeID=F.storeID
+retail(# ) AS a;
+ linear_regression_slope | linear_regression_intercept | linear_regression_r2  
+-------------------------+-----------------------------+-----------------------
+ -1.9395376239153474e-06 |           7.826686660542328 | 0.0005571826397209093
+(1 row)
+
+retail=# SELECT
+retail-# var_samp(unem) AS Unemploy_Variance,
+retail-# stddev_samp(unem) AS Unemploy_StdDev,
+retail-# var_samp(sales) AS Sales_Variance,
+retail-# stddev_samp(sales) AS Sales_StdDev
+retail-# FROM(
+retail(# SELECT
+retail(# 
+
+retail(# CAST(F.unemployment AS double precision) AS unem, 
+retail(# 
+
+retail(# CAST((SA.weeklySales/'$1') AS double precision) AS sales
+retail(# FROM retailStores.Sales AS SA
+retail(# INNER JOIN retailStores.Features AS F
+retail(# ON SA.storeID=F.storeID
+retail(# ) AS a;
+ unemploy_variance |  unemploy_stddev  |  sales_variance  |    sales_stddev    
+-------------------+-------------------+------------------+--------------------
+  3.48238954212907 | 1.866116165229022 | 515796640.047196 | 22711.156730717084
+(1 row)
+
+retail=# DELETE FROM retailStores.Stores WHERE storeID=46;
+DELETE 1
+retail=# SELECT * FROM retailStores.Stores;
+ storeid | storetype | storesize 
+---------+-----------+-----------
+       1 | A         |    151315
+       2 | A         |    202307
+       3 | B         |     37392
+       4 | A         |    205863
+       5 | B         |     34875
+       6 | A         |    202505
+       7 | B         |     70713
+       8 | A         |    155078
+       9 | B         |    125833
+      10 | B         |    126512
+      11 | A         |    207499
+      12 | B         |    112238
+      13 | A         |    219622
+      14 | A         |    200898
+      15 | B         |    123737
+      16 | B         |     57197
+      17 | B         |     93188
+      18 | B         |    120653
+      19 | A         |    203819
+      20 | A         |    203742
+      21 | B         |    140167
+      22 | B         |    119557
+      23 | B         |    114533
+      24 | A         |    203819
+      25 | B         |    128107
+      26 | A         |    152513
+      27 | A         |    204184
+      28 | A         |    206302
+      29 | B         |     93638
+      30 | C         |     42988
+      31 | A         |    203750
+      32 | A         |    203007
+      33 | A         |     39690
+      34 | A         |    158114
+      35 | B         |    103681
+      36 | A         |     39910
+      37 | C         |     39910
+      38 | C         |     39690
+      39 | A         |    184109
+      40 | A         |    155083
+      41 | A         |    196321
+      42 | C         |     39690
+      43 | C         |     41062
+      44 | C         |     39910
+      45 | B         |    118221
+(45 rows)
+
+retail=# 

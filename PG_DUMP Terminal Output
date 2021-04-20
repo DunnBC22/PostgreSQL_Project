@@ -1,0 +1,20 @@
+Last login: Mon Apr 19 08:32:33 on ttys000
+
+briandunn$ pg_dump -U postgres -s retail > '/Users/briandunn/Desktop/DataSetsforMySQL/RetailDataAnalytics-PostgreSQL/PG_DUMP.sql'
+briandunn$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
